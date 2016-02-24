@@ -10,6 +10,8 @@ You have to wait for about 1 minute for complete. If everything is OK and the pr
 
 You can just copy and open it in your browser.
 
+If there is anything failed, you will see something like `error`, or `invalid status code` in the output.
+
 Note
 ====
 
