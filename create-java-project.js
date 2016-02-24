@@ -2,14 +2,16 @@ var request = require('request');
 
 function nextId() { return new Date().getTime(); }
 
-var workspaceName = "wksp-" + nextId();
+var workspaceName = "java-" + nextId();
 
 console.error(workspaceName);
 
 var baseUrl = 'http://198.199.105.97:8080';
-var recipeLocation = 'https://gist.githubusercontent.com/freewind/adb03cbbbd78d4f5379f/raw/6419e1d14bf4b62d32a9ce717644718eba51d8de/recipe.txt';
-
-
+var recipeLocation = 'https://gist.githubusercontent.com/freewind/bd27c65604cf072c8979/raw/ce12aa30ab87b497e7a6bd52ea84a4fb8ab02fa7/js_frontend.txt';
+var templateProjectGitUrl = "https://github.com/che-samples/console-java-simple.git";
+var projectName = "console-java-simple";
+var projectDescription = "A hello world Java application.";
+var ram = 1000;
 
 request.post(baseUrl + '/api/auth/login', function(err, res, body) {
 	console.log("------------------- login OK: --------------");
@@ -28,7 +30,7 @@ request.post(baseUrl + '/api/auth/login', function(err, res, body) {
 				machineConfigs: [{
 					name: "ws-machine",
 					limits: {
-						ram: 1000
+						ram: ram
 					},
 					type: "docker",
 					source: {
@@ -68,10 +70,10 @@ request.post(baseUrl + '/api/auth/login', function(err, res, body) {
 			console.log(JSON.stringify(body));
 
 			setTimeout(function() {
-				request.post(baseUrl + '/api/ext/project/' + workspaceId + '/import/console-java-simple', {
+				request.post(baseUrl + '/api/ext/project/' + workspaceId + '/import/' + projectName, {
 					json: true,
 					body: {
-						"location":"https://github.com/che-samples/console-java-simple.git",
+						"location": templateProjectGitUrl,
 						"parameters":{},
 						"type":"git"
 					}
@@ -96,7 +98,7 @@ request.post(baseUrl + '/api/auth/login', function(err, res, body) {
 								json: true,
 								body: {
 									"commandLine":cmd,
-									"name":"console-java-simple: build",
+									"name": projectName + ": build",
 									"type":"mvn",
 									"attributes":{"previewUrl":""}
 								}
@@ -110,11 +112,11 @@ request.post(baseUrl + '/api/auth/login', function(err, res, body) {
 							})
 						})
 
-						request.put(baseUrl + '/api/ext/project/'+workspaceId + '/console-java-simple', {
+						request.put(baseUrl + '/api/ext/project/'+workspaceId + '/' + projectName, {
 							json: true,
 							body: {
-								"name": "console-java-simple",
-								"description": "A hello world Java application.",
+								"name": projectName,
+								"description": projectDescription,
 								"type": "maven",
 								"commands": [{
 									"commandLine": "mvn -f ${current.project.path} clean install",
@@ -158,73 +160,4 @@ request.post(baseUrl + '/api/auth/login', function(err, res, body) {
 });
 
 
-
-/*
-request.post(baseUrl + '/api/auth/login')
-.then(function(body) {
-	console.log("login OK: " + body);
-})
-.then(function() {
-	return request.post(baseUrl + '/api/workspace/config?account=', {
-		json: true,
-		body: {
-			environments: [{
-				name: workspaceName,
-				recipe: null,
-				machineConfigs: [{
-					name: "ws-machine",
-					limits: {
-						ram: 1000
-					},
-					type: "docker",
-					source: {
-						location: recipeLocation,
-						type: "recipe"
-					},
-					dev: true
-				}]
-			}],
-			name: workspaceName,
-			attributes: {},
-			projects: [],
-			defaultEnv: workspaceName,
-			description: null,
-			commands: [],
-			links: []
-		}
-	})
-})
-.then(function(body) {
-	console.log("-------------- workspace created: ---------------");
-	console.log(JSON.stringify(body));
-	var workspaceId = body.id;
-	console.log("workspaceId: " + workspaceId);
-	return request.post(baseUrl + '/api/workspace/' + workspaceId + '/runtime?environment=' + workspaceName, {
-		json: true
-	});
-})
-.then(function(body) {
-	console.log("-------------- workspace started: ---------------");
-	console.log(JSON.stringify(body));
-	return body.id;
-})
-.then(function(workspaceId) {
-	return request.post(baseUrl + '/api/ext/project/' + workspaceId + '/import/console-java-simple', {
-		json: true,
-		body: {
-			"location":"https://github.com/che-samples/console-java-simple.git",
-			"parameters":{},
-			"type":"git"
-		}
-	});
-})
-.then(function(body) {
-	console.log("-------------- project imported: ---------------");
-	console.log(JSON.stringify(body));
-})
-.catch(function (err) {
-	console.error("error: " + err);
-});
-
-*/
 
