@@ -1,3 +1,11 @@
+var BASE_URL = 'http://198.199.105.97:8080';
+var RECIPE_LOCATION = 'https://gist.githubusercontent.com/freewind/bd27c65604cf072c8979/raw/ce12aa30ab87b497e7a6bd52ea84a4fb8ab02fa7/js_frontend.txt';
+var TEMPLATE_PROJECT_GIT_URL = 'https://github.com/freewind/js_homework1.git';
+var PROJECT_NAME = "js_homework1"
+var RAM = 128;
+
+//---------------------------------------
+
 var request = require('request');
 
 function nextId() { return new Date().getTime(); }
@@ -6,13 +14,8 @@ var workspaceName = "js-" + nextId();
 
 console.error(workspaceName);
 
-var baseUrl = 'http://198.199.105.97:8080';
-var recipeLocation = 'https://gist.githubusercontent.com/freewind/bd27c65604cf072c8979/raw/ce12aa30ab87b497e7a6bd52ea84a4fb8ab02fa7/js_frontend.txt';
-var templateProjectGitUrl = 'https://github.com/freewind/js_homework1.git';
-var projectName = "js_homework1"
-var ram = 128;
 
-request.post(baseUrl + '/api/auth/login', function(err, res, body) {
+request.post(BASE_URL + '/api/auth/login', function(err, res, body) {
 	console.log("------------------- login OK: --------------");
 
 	if(err) return console.error("error: " + err);
@@ -20,7 +23,7 @@ request.post(baseUrl + '/api/auth/login', function(err, res, body) {
 
 	console.log(body);
 
-	request.post(baseUrl + '/api/workspace/config?account=', {
+	request.post(BASE_URL + '/api/workspace/config?account=', {
 		json: true,
 		body: {
 			environments: [{
@@ -29,11 +32,11 @@ request.post(baseUrl + '/api/auth/login', function(err, res, body) {
 				machineConfigs: [{
 					name: "ws-machine",
 					limits: {
-						ram: ram
+						ram: RAM
 					},
 					type: "docker",
 					source: {
-						location: recipeLocation,
+						location: RECIPE_LOCATION,
 						type: "recipe"
 					},
 					dev: true
@@ -58,7 +61,7 @@ request.post(baseUrl + '/api/auth/login', function(err, res, body) {
 		var workspaceId = body.id;
 		console.log("workspaceId: " + workspaceId);
 
-		request.post(baseUrl + '/api/workspace/' + workspaceId + '/runtime?environment=' + workspaceName, {
+		request.post(BASE_URL + '/api/workspace/' + workspaceId + '/runtime?environment=' + workspaceName, {
 			json: true
 		}, function(err, res, body) {
 			console.log("-------------- workspace started: ---------------");
@@ -69,10 +72,10 @@ request.post(baseUrl + '/api/auth/login', function(err, res, body) {
 			console.log(JSON.stringify(body));
 
 			setTimeout(function() {
-				request.post(baseUrl + '/api/ext/project/' + workspaceId + '/import/' + projectName, {
+				request.post(BASE_URL + '/api/ext/project/' + workspaceId + '/import/' + PROJECT_NAME, {
 					json: true,
 					body: {
-						"location": templateProjectGitUrl,
+						"location": TEMPLATE_PROJECT_GIT_URL,
 						"parameters":{},
 						"type":"git"
 					}
@@ -83,7 +86,7 @@ request.post(baseUrl + '/api/auth/login', function(err, res, body) {
 					if(res.statusCode!=204) return console.warn("invalid status code: " + res.statusCode);
 
 					
-					request.get(baseUrl + '/api/ext/project/' + workspaceId, function(err, res, body) {
+					request.get(BASE_URL + '/api/ext/project/' + workspaceId, function(err, res, body) {
 						console.log("-------------- projects information: ---------------");
 
 						if(err) return console.error("error: " + err);
@@ -91,13 +94,13 @@ request.post(baseUrl + '/api/auth/login', function(err, res, body) {
 
 						console.log(JSON.stringify(body));
 
-						request.get(baseUrl + '/api/ext/project/' + workspaceId, function(err, res, body) {
+						request.get(BASE_URL + '/api/ext/project/' + workspaceId, function(err, res, body) {
 							console.log("---------- open project url in browse: ------------");
 
 							if(err) return console.error("error: " + err);
 							if(res.statusCode!=200) return console.warn("invalid status code: " + res.statusCode);
 
-							console.log(baseUrl + "/ide/" + workspaceName);
+							console.log(BASE_URL + "/ide/" + workspaceName);
 						})
 						
 					});
