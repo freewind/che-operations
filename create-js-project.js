@@ -1,4 +1,5 @@
 var BASE_URL = 'http://198.199.105.97:8080';
+var WS_BASE_URL = 'ws://198.199.105.97:8080'
 var RECIPE_LOCATION = 'https://gist.githubusercontent.com/freewind/bd27c65604cf072c8979/raw/ce12aa30ab87b497e7a6bd52ea84a4fb8ab02fa7/js_frontend.txt';
 var TEMPLATE_PROJECT_GIT_URL = 'https://github.com/freewind/js_homework1.git';
 var PROJECT_NAME = "js_homework1"
@@ -6,7 +7,9 @@ var RAM = 128;
 
 //---------------------------------------
 
-var request = require('request');
+var request = require('request-promise').defaults({ json: true });
+var WebSocketClient = require('websocket').client;
+var wsClient = new WebSocketClient();
 
 function nextId() { return new Date().getTime(); }
 
@@ -14,17 +17,85 @@ var workspaceName = "js-" + nextId();
 
 console.error(workspaceName);
 
+function importProject(workspaceId) {
+	console.log('------------------- import project ----------------- ');
+	request.post(BASE_URL + '/api/ext/project/' + workspaceId + '/import/' + PROJECT_NAME, {
+		body: {
+			"location": TEMPLATE_PROJECT_GIT_URL,
+			"parameters":{},
+			"type":"git"
+		}
+	})
+	.then(function() {
+		console.log('--------------- get project information --------------');
+		return request.get(BASE_URL + '/api/ext/project/' + workspaceId);
+	})
+	.then(function(body) {
+		console.log(JSON.stringify(body));
+	})
+	.then(function(body){
+		console.log("---------- open project url in browser ------------");
+		console.log(BASE_URL + "/ide/" + workspaceName);
+	})
+	.catch(function(err) {
+		console.error('Error: ' + err);
+	});
+}
 
-request.post(BASE_URL + '/api/auth/login', function(err, res, body) {
-	console.log("------------------- login OK: --------------");
+function checkWorkspaceStatusAndImportProject(workspaceId) {
+	var wsUrl = WS_BASE_URL + '/api/ws/' + workspaceId;
+	console.log("Connect to: " + wsUrl);
+	wsClient.connect(wsUrl);
 
-	if(err) return console.error("error: " + err);
-	if(res.statusCode!=200) return console.warn("invalid status code: " + res.statusCode);
+	wsClient.on('connectFailed', function(error) {
+		console.log('Connect Error: ' + error.toString());
+	});
 
-	console.log(body);
+	wsClient.on('connect', function(connection) {
+		console.log('WebSocket Client Connected');
+		connection.sendUTF(JSON.stringify({
+			"method": "POST",
+			"headers": [{
+				"name": "x-everrest-websocket-message-type",
+				"value": "subscribe-channel"
+			}],
+			"body": "{\"channel\":\"workspace:"+workspaceId+"\"}"
+		}));
 
-	request.post(BASE_URL + '/api/workspace/config?account=', {
-		json: true,
+		connection.on('error', function(error) {
+			console.log("Connection Error: " + error.toString());
+		});
+		connection.on('close', function() {
+			console.log('Connection Closed');
+		});
+		connection.on('message', function(message) {
+			console.log("Received: " + message.utf8Data);
+			var body = JSON.parse(JSON.parse(message.utf8Data).body);
+			var eventType = body.eventType;
+			console.log("EventType: " + eventType);
+
+			if(eventType === 'ERROR') {
+				console.error("Error occures when starting workspace");
+				return;
+			}
+			if(eventType === "RUNNING") {
+				importProject(workspaceId);
+				connection.close();
+			}
+		});
+	});
+}
+
+console.log("------------------- login: --------------");
+
+request.post(BASE_URL + '/api/auth/login')
+.then(function(body) {
+	console.log(body);	
+})
+.then(function() {
+	console.log("-------------- create workspace: ---------------");
+
+	return request.post(BASE_URL + '/api/workspace/config?account=', {
 		body: {
 			environments: [{
 				name: workspaceName,
@@ -50,64 +121,25 @@ request.post(BASE_URL + '/api/auth/login', function(err, res, body) {
 			commands: [],
 			links: []
 		}
-	}, function(err, res, body) {
-		console.log("-------------- workspace created: ---------------");
-
-		if(err) return console.error("error: " + err);
-		if(res.statusCode!=201) return console.warn("invalid status code: " + res.statusCode);
-
-		console.log(JSON.stringify(body));
-
-		var workspaceId = body.id;
-		console.log("workspaceId: " + workspaceId);
-
-		request.post(BASE_URL + '/api/workspace/' + workspaceId + '/runtime?environment=' + workspaceName, {
-			json: true
-		}, function(err, res, body) {
-			console.log("-------------- workspace started: ---------------");
-
-			if(err) return console.error("error: " + err);
-			if(res.statusCode!=200) return console.warn("invalid status code: " + res.statusCode);
-
-			console.log(JSON.stringify(body));
-
-			setTimeout(function() {
-				request.post(BASE_URL + '/api/ext/project/' + workspaceId + '/import/' + PROJECT_NAME, {
-					json: true,
-					body: {
-						"location": TEMPLATE_PROJECT_GIT_URL,
-						"parameters":{},
-						"type":"git"
-					}
-				}, function(err, res, body) {
-					console.log("-------------- project imported: ---------------");
-
-					if(err) return console.error("error: " + err);
-					if(res.statusCode!=204) return console.warn("invalid status code: " + res.statusCode);
-
-					
-					request.get(BASE_URL + '/api/ext/project/' + workspaceId, function(err, res, body) {
-						console.log("-------------- projects information: ---------------");
-
-						if(err) return console.error("error: " + err);
-						if(res.statusCode!=200) return console.warn("invalid status code: " + res.statusCode);
-
-						console.log(JSON.stringify(body));
-
-						request.get(BASE_URL + '/api/ext/project/' + workspaceId, function(err, res, body) {
-							console.log("---------- open project url in browse: ------------");
-
-							if(err) return console.error("error: " + err);
-							if(res.statusCode!=200) return console.warn("invalid status code: " + res.statusCode);
-
-							console.log(BASE_URL + "/ide/" + workspaceName);
-						})
-						
-					});
-				});
-			}, 30000);
-		});
-	})
+	});
+})
+.then(function(body) {
+	console.log(JSON.stringify(body));
+	var workspaceId = body.id;
+	console.log("workspaceId: " + workspaceId);
+	return workspaceId;
+})
+.then(function(workspaceId) {
+	console.log("-------------- start workspace asynchronously ---------------")
+	return request.post(BASE_URL + '/api/workspace/' + workspaceId + '/runtime?environment=' + workspaceName);
+})
+.then(function(body) {
+	console.log(JSON.stringify(body));
+	var workspaceId = body.id;
+	console.log("workspaceId: " + workspaceId);
+	checkWorkspaceStatusAndImportProject(workspaceId);
+})
+.catch(function(err) {
+	console.error('error: ' + err);
+	console.error(err.stack);
 });
-
-
