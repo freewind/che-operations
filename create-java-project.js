@@ -1,170 +1,22 @@
-var request = require('request');
+var createProject = require('./create-project');
 
-function nextId() { return new Date().getTime(); }
-
-var workspaceName = "java-" + nextId();
-
-console.error(workspaceName);
-
-var baseUrl = 'http://198.199.105.97:8080';
-var recipeLocation = 'https://gist.githubusercontent.com/freewind/adb03cbbbd78d4f5379f/raw/91238a5a303567b6a60e36a63f0cc170b385ecc3/ubuntu_jdk8.txt';
-var templateProjectGitUrl = "https://github.com/che-samples/console-java-simple.git";
-var projectName = "console-java-simple";
-var projectDescription = "A hello world Java application.";
-var ram = 1000;
-
-request.post(baseUrl + '/api/auth/login', function(err, res, body) {
-	console.log("------------------- login OK: --------------");
-
-	if(err) return console.error("error: " + err);
-	if(res.statusCode!=200) return console.warn("invalid status code: " + res.statusCode);
-
-	console.log(body);
-
-	request.post(baseUrl + '/api/workspace/config?account=', {
-		json: true,
-		body: {
-			environments: [{
-				name: workspaceName,
-				recipe: null,
-				machineConfigs: [{
-					name: "ws-machine",
-					limits: {
-						ram: ram
-					},
-					type: "docker",
-					source: {
-						location: recipeLocation,
-						type: "recipe"
-					},
-					dev: true
-				}]
-			}],
-			name: workspaceName,
-			attributes: {},
-			projects: [],
-			defaultEnv: workspaceName,
-			description: null,
-			commands: [],
-			links: []
-		}
-	}, function(err, res, body) {
-		console.log("-------------- workspace created: ---------------");
-
-		if(err) return console.error("error: " + err);
-		if(res.statusCode!=201) return console.warn("invalid status code: " + res.statusCode);
-
-		console.log(JSON.stringify(body));
-
-		var workspaceId = body.id;
-		console.log("workspaceId: " + workspaceId);
-
-		request.post(baseUrl + '/api/workspace/' + workspaceId + '/runtime?environment=' + workspaceName, {
-			json: true
-		}, function(err, res, body) {
-			console.log("-------------- workspace started: ---------------");
-
-			if(err) return console.error("error: " + err);
-			if(res.statusCode!=200) return console.warn("invalid status code: " + res.statusCode);
-
-			console.log(JSON.stringify(body));
-
-			setTimeout(function() {
-				request.post(baseUrl + '/api/ext/project/' + workspaceId + '/import/' + projectName, {
-					json: true,
-					body: {
-						"location": templateProjectGitUrl,
-						"parameters":{},
-						"type":"git"
-					}
-				}, function(err, res, body) {
-					console.log("-------------- project imported: ---------------");
-
-					if(err) return console.error("error: " + err);
-					if(res.statusCode!=204) return console.warn("invalid status code: " + res.statusCode);
-
-					
-					request.get(baseUrl + '/api/ext/project/' + workspaceId, function(err, res, body) {
-						console.log("-------------- projects information: ---------------");
-
-						if(err) return console.error("error: " + err);
-						if(res.statusCode!=200) return console.warn("invalid status code: " + res.statusCode);
-
-						console.log(JSON.stringify(body));
-
-						[
-						{
-							name: projectName + ': build',
-							command: "mvn -f ${current.project.path} clean install"
-						},
-						{
-							name: projectName + ': run',
-							command: "mvn -f ${current.project.path} clean install && java -jar ${current.project.path}/target/*.jar"
-						}].forEach(function(cmd) {
-							request.post(baseUrl + '/api/workspace/'+workspaceId+'/command', {
-								json: true,
-								body: {
-									"commandLine":cmd.command,
-									"name": cmd.name,
-									"type":"mvn",
-									"attributes":{"previewUrl":""}
-								}
-							}, function(err, res, body) {
-								console.log("-------------- command created: ----------------");
-
-								if(err) return console.error("error: " + err);
-								if(res.statusCode!=200) return console.warn("invalid status code: " + res.statusCode);
-								console.log(cmd);
-
-							})
-						})
-
-						request.put(baseUrl + '/api/ext/project/'+workspaceId + '/' + projectName, {
-							json: true,
-							body: {
-								"name": projectName,
-								"description": projectDescription,
-								"type": "maven",
-								"commands": [{
-									"commandLine": "mvn -f ${current.project.path} clean install",
-									"name": "build",
-									"type": "mvn",
-									"attributes": {
-										"previewUrl": ""
-									}
-								}, {
-									"commandLine": "mvn -f ${current.project.path} clean install && java -jar ${current.project.path}/target/*.jar",
-									"name": "run",
-									"type": "mvn",
-									"attributes": {
-										"previewUrl": ""
-									}
-								}]
-							}
-						}, function(err, res, body) {
-							console.log("----------- updated project commands: --------------");
-
-							if(err) return console.error("error: " + err);
-							if(res.statusCode!=200) return console.warn("invalid status code: " + res.statusCode);
-
-							console.log(JSON.stringify(body));
-
-							request.get(baseUrl + '/api/ext/project/' + workspaceId, function(err, res, body) {
-								console.log("---------- open project url in browse: ------------");
-
-								if(err) return console.error("error: " + err);
-								if(res.statusCode!=200) return console.warn("invalid status code: " + res.statusCode);
-
-								console.log(baseUrl + "/ide/" + workspaceName);
-							})
-						})
-						
-					});
-				});
-			}, 30000);
-		});
-	})
+createProject({
+	workspacePrifix: 'java',
+	baseUrl : 'http://198.199.105.97:8080',
+	wsBaseUrl : 'ws://198.199.105.97:8080',
+	recipeLocation : 'https://gist.githubusercontent.com/freewind/adb03cbbbd78d4f5379f/raw/91238a5a303567b6a60e36a63f0cc170b385ecc3/ubuntu_jdk8.txt',
+	templateProjectGitUrl : 'https://github.com/che-samples/console-java-simple.git',
+	projectName : "console-java-simple",
+	ram : 1000,
+	commands: [{
+		name: 'build',
+		type: 'mvn',
+		commandLine: "mvn -f ${current.project.path} clean install"
+	},
+	{
+		name: 'run',
+		type: 'mvn',
+		commandLine: "mvn -f ${current.project.path} clean install && java -jar ${current.project.path}/target/*.jar"
+	}]
 });
-
-
 
