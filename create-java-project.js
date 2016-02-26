@@ -7,7 +7,7 @@ var workspaceName = "java-" + nextId();
 console.error(workspaceName);
 
 var baseUrl = 'http://198.199.105.97:8080';
-var recipeLocation = 'https://gist.githubusercontent.com/freewind/bd27c65604cf072c8979/raw/ce12aa30ab87b497e7a6bd52ea84a4fb8ab02fa7/js_frontend.txt';
+var recipeLocation = 'https://gist.githubusercontent.com/freewind/adb03cbbbd78d4f5379f/raw/91238a5a303567b6a60e36a63f0cc170b385ecc3/ubuntu_jdk8.txt';
 var templateProjectGitUrl = "https://github.com/che-samples/console-java-simple.git";
 var projectName = "console-java-simple";
 var projectDescription = "A hello world Java application.";
@@ -92,13 +92,20 @@ request.post(baseUrl + '/api/auth/login', function(err, res, body) {
 
 						console.log(JSON.stringify(body));
 
-						["mvn -f ${current.project.path} clean install",
-						"mvn -f ${current.project.path} clean install && java -jar ${current.project.path}/target/*.jar"].forEach(function(cmd) {
+						[
+						{
+							name: projectName + ': build',
+							command: "mvn -f ${current.project.path} clean install"
+						},
+						{
+							name: projectName + ': run',
+							command: "mvn -f ${current.project.path} clean install && java -jar ${current.project.path}/target/*.jar"
+						}].forEach(function(cmd) {
 							request.post(baseUrl + '/api/workspace/'+workspaceId+'/command', {
 								json: true,
 								body: {
-									"commandLine":cmd,
-									"name": projectName + ": build",
+									"commandLine":cmd.command,
+									"name": cmd.name,
 									"type":"mvn",
 									"attributes":{"previewUrl":""}
 								}
